@@ -1,0 +1,2754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeathRoom - Basic Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        #message {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+        #startButton {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 30px;
+            font-size: 20px;
+            background-color: #ff3333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 10;
+        }
+        #healthBar {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 300px;
+            height: 25px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 2px solid #ffffff;
+            border-radius: 5px;
+            z-index: 5;
+        }
+        #healthFill {
+            width: 100%;
+            height: 100%;
+            background-color: #ff3333;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+        #bossHealthBar {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 500px;
+            height: 25px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 2px solid #ffffff;
+            border-radius: 5px;
+            z-index: 5;
+            display: none;
+        }
+        #bossHealthFill {
+            width: 100%;
+            height: 100%;
+            background-color: #9933ff;
+            border-radius: 3px;
+            transition: width 0.5s;
+        }
+        #bossName {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 20px;
+            color: #ffffff;
+            text-shadow: 0 0 10px #9933ff;
+            z-index: 5;
+            display: none;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: white;
+            z-index: 5;
+        }
+        #controls {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 5;
+        }
+        #statsPanel {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            padding: 10px 20px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 1px solid #ffffff;
+            border-radius: 5px;
+            font-size: 16px;
+            z-index: 5;
+        }
+        #weaponDisplay {
+            position: absolute;
+            bottom: 70px;
+            right: 30px;
+            padding: 10px 20px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 1px solid #ffffff;
+            border-radius: 5px;
+            font-size: 18px;
+            z-index: 5;
+        }
+        #pickupMessage {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 20px;
+            color: #ffff33;
+            text-shadow: 0 0 10px #ff9900;
+            opacity: 0;
+            transition: opacity 0.5s;
+            z-index: 5;
+        }
+        .fadeOut {
+            animation: fadeOut 2s forwards;
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        #damageOverlay {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 0, 0, 0.2);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 4;
+        }
+    </style>
+</head>
+<body>
+    <div id="message">Loading Simple Game...</div>
+                <button id="startButton">START GAME</button>
+    <div id="healthBar" style="display: none;">
+            <div id="healthFill"></div>
+        </div>
+    <div id="bossHealthBar">
+            <div id="bossHealthFill"></div>
+        </div>
+    <div id="bossName"></div>
+    <div id="crosshair" style="display: none;">+</div>
+    <div id="controls" style="display: none;">
+        WASD: Move | Mouse: Look | Click: Shoot
+    </div>
+    <div id="statsPanel" style="display: none;">
+            <div>Strength: <span id="strengthStat">1</span></div>
+            <div>Speed: <span id="speedStat">1</span></div>
+        <div>Room: <span id="roomStat">1</span></div>
+        </div>
+    <div id="weaponDisplay" style="display: none;">
+        <div id="currentWeapon">Blaster</div>
+        </div>
+    <div id="pickupMessage"></div>
+    <div id="damageOverlay"></div>
+
+    <!-- Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <!-- Stats.js for performance monitoring -->
+    <script src="https://mrdoob.github.io/stats.js/build/stats.min.js"></script>
+
+    <script>
+        // Get DOM elements
+        const messageEl = document.getElementById('message');
+        const startButton = document.getElementById('startButton');
+        const healthBar = document.getElementById('healthBar');
+        const healthFill = document.getElementById('healthFill');
+        const bossHealthBar = document.getElementById('bossHealthBar');
+        const bossHealthFill = document.getElementById('bossHealthFill');
+        const bossNameElement = document.getElementById('bossName');
+        const crosshair = document.getElementById('crosshair');
+        const controls = document.getElementById('controls');
+        const statsPanel = document.getElementById('statsPanel');
+        const strengthStat = document.getElementById('strengthStat');
+        const speedStat = document.getElementById('speedStat');
+        const roomStat = document.getElementById('roomStat');
+        const weaponDisplay = document.getElementById('weaponDisplay');
+        const currentWeapon = document.getElementById('currentWeapon');
+        const pickupMessage = document.getElementById('pickupMessage');
+        const damageOverlay = document.getElementById('damageOverlay');
+        
+        // Game variables
+        let scene, camera, renderer, clock;
+        let player, enemy;
+        let isRunning = false;
+        let moveForward = false;
+        let moveBackward = false;
+        let moveLeft = false;
+        let moveRight = false;
+        let currentRoomIndex = 0;
+        let rooms = [];
+        let stats; // Performance stats
+        let animatedObjects = []; // Global array to track all animated objects
+        let maxLights = 8; // Maximum number of lights allowed in scene
+        let lightCount = 0; // Current light count
+        let maxProjectiles = 20; // Maximum projectiles allowed at once
+        
+        // Project array
+        const projectiles = [];
+        
+        // Projectile pool for reusing objects instead of creating/destroying
+        const projectilePool = {
+            available: [],
+            active: [],
+            
+            getProjectile: function(isEnemy = false) {
+                // Return from pool if available
+                if (this.available.length > 0) {
+                    const projectile = this.available.pop();
+                    this.active.push(projectile);
+                    return projectile;
+                }
+                
+                // Create new projectile if below max
+                if (this.active.length < maxProjectiles) {
+                    // Create with simplified geometry
+                    const size = isEnemy ? 0.2 : 0.1;
+                    const projectileGeometry = new THREE.SphereGeometry(size, 4, 4);
+                    const projectileMaterial = new THREE.MeshBasicMaterial({
+                        color: isEnemy ? 0xff3300 : 0xff0000
+                    });
+                    const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+                    
+                    // Only add light if we haven't reached maximum
+                    if (lightCount < maxLights) {
+                        const light = new THREE.PointLight(
+                            isEnemy ? 0xff3300 : 0xff0000, 
+                            0.4, 
+                            2
+                        );
+                        projectile.add(light);
+                        lightCount++;
+                    }
+                    
+                    this.active.push(projectile);
+                    return projectile;
+                }
+                
+                // If at max, reuse oldest
+                const oldest = this.active.shift();
+                this.active.push(oldest);
+                return oldest;
+            },
+            
+            releaseProjectile: function(projectile) {
+                // Remove from active
+                const index = this.active.indexOf(projectile);
+                if (index !== -1) {
+                    this.active.splice(index, 1);
+                }
+                
+                // Hide and remove from scene
+                scene.remove(projectile);
+                
+                // Reset state
+                projectile.visible = false;
+                projectile.userData = {};
+                
+                // Add to available
+                this.available.push(projectile);
+            },
+            
+            releaseAll: function() {
+                // Release all active projectiles
+                while (this.active.length > 0) {
+                    const projectile = this.active.pop();
+                    scene.remove(projectile);
+                    projectile.visible = false;
+                    this.available.push(projectile);
+                }
+            }
+        };
+        
+        // Initialize game
+        function init() {
+            try {
+                messageEl.textContent = "Initializing...";
+                
+                console.log("Initialization started...");
+                
+                // Initialize stats
+                stats = new Stats();
+                stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
+                document.body.appendChild(stats.dom);
+                stats.dom.style.position = 'absolute';
+                stats.dom.style.top = '0px';
+                stats.dom.style.left = '0px';
+                stats.dom.style.zIndex = '10';
+                console.log("Stats initialized");
+                
+                // Create scene
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x111111);
+                console.log("Scene created");
+                
+                // Create camera
+                console.log("Creating camera");
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.set(0, 1.7, 0); // Player height
+                camera.rotation.order = 'YXZ'; // Important for first-person controls to prevent gimbal lock
+                console.log("Camera created with YXZ rotation order");
+                
+                // Create renderer with optimized settings
+                renderer = new THREE.WebGLRenderer({ 
+                    antialias: false, // Disable antialiasing for performance
+                    powerPreference: 'high-performance'
+                });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                // Set pixel ratio to 1 for better performance
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
+                document.body.appendChild(renderer.domElement);
+                console.log("Renderer created and added to DOM");
+                
+                // Create clock for timing
+                clock = new THREE.Clock();
+                
+                // Create first room
+                console.log("Creating first room (fire theme)");
+                createRoom('fire', 1);
+                
+                // Initialize the player with default setup
+                console.log("Creating player");
+                player = createPlayer();
+                console.log("Player created");
+                
+                // Create boss
+                console.log("Creating boss");
+                try {
+                    enemy = createBoss('fire', 1);
+                    console.log("Boss created:", enemy.name);
+                    
+                    // Show boss UI
+                    console.log("Showing boss UI");
+                    enemy.showBossUI();
+                } catch (bossError) {
+                    console.error("Error creating boss:", bossError);
+                    messageEl.textContent = "Warning: Could not create boss - " + bossError.message;
+                }
+                
+                // Setup controls
+                console.log("Setting up controls");
+                setupControls();
+                
+                // Handle window resize
+                window.addEventListener('resize', onWindowResize);
+                
+                // Show UI
+                console.log("Displaying UI elements");
+                healthBar.style.display = 'block';
+                crosshair.style.display = 'block';
+                controls.style.display = 'block';
+                statsPanel.style.display = 'block';
+                weaponDisplay.style.display = 'block';
+                
+                // Hide message after a few seconds
+                setTimeout(() => {
+                    messageEl.style.opacity = '0';
+                    setTimeout(() => messageEl.style.display = 'none', 1000);
+                }, 3000);
+                
+                messageEl.textContent = "Game running! Look around with your mouse.";
+                console.log("Initialization complete");
+                
+                // Start game loop
+                isRunning = true;
+                
+                // Use performance timing for the animation loop
+                let lastFrameTime = 0;
+                const targetFrameRate = 60; // Cap at 60 FPS
+                const frameInterval = 1000 / targetFrameRate;
+                
+                function animateWithFrameLimit(currentTime) {
+                    if (!isRunning) return;
+                    
+                    requestAnimationFrame(animateWithFrameLimit);
+                    
+                    // Begin stats measurement
+                    stats.begin();
+                    
+                    // Calculate elapsed time since last frame
+                    const elapsed = currentTime - lastFrameTime;
+                    
+                    // Only update if enough time has passed
+                    if (elapsed > frameInterval) {
+                        // Adjust time to maintain consistent timing
+                        lastFrameTime = currentTime - (elapsed % frameInterval);
+                        animate();
+                    }
+                    
+                    // End stats measurement
+                    stats.end();
+                }
+                
+                // Start the animation loop with frame limiting
+                requestAnimationFrame(animateWithFrameLimit);
+            }
+            catch(error) {
+                messageEl.textContent = "Error during initialization: " + error.message;
+                console.error("Initialization error:", error);
+                // Show error details in console
+                console.error(error.stack);
+            }
+        }
+        
+        // Create a room with the specified theme
+        function createRoom(theme = 'fire', roomIndex = 1) {
+            // Clear any existing room
+            if (rooms[currentRoomIndex]) {
+                // Remove all objects from the previous room
+                rooms[currentRoomIndex].objects.forEach(obj => {
+                    scene.remove(obj);
+                });
+            }
+            
+            // Define the color scheme based on the theme
+            const themeColors = {
+                fire: {
+                    floor: 0x3c1f0e,
+                    walls: 0x501a00,
+                    emissive: 0xff3300,
+                    light: 0xff5500,
+                    intensity: 0.8,
+                    ambient: 0x661100
+                },
+                ice: {
+                    floor: 0x2a4861,
+                    walls: 0x1e3a4d,
+                    emissive: 0x33ccff,
+                    light: 0x66ddff,
+                    intensity: 0.7,
+                    ambient: 0x0a2033
+                },
+                undead: {
+                    floor: 0x1a1a1a,
+                    walls: 0x0d0d0d,
+                    emissive: 0x22ff00,
+                    light: 0x55cc44,
+                    intensity: 0.6,
+                    ambient: 0x111111
+                },
+                mechanical: {
+                    floor: 0x444444,
+                    walls: 0x333333,
+                    emissive: 0xccaa00,
+                    light: 0xffcc33,
+                    intensity: 0.8,
+                    ambient: 0x222222
+                }
+            };
+            
+            // Default to fire theme if the specified theme doesn't exist
+            const colors = themeColors[theme] || themeColors.fire;
+            
+            // Create the room object
+            const room = {
+                theme: theme,
+                index: roomIndex,
+                doorOpen: false,
+                objects: [],
+                pickups: [],
+                
+                // Method to add object to tracking
+                addObject: function(object) {
+                    this.objects.push(object);
+                    return object;
+                }
+            };
+            
+            // Floor
+            const floorGeometry = new THREE.PlaneGeometry(20, 20);
+            const floorMaterial = new THREE.MeshStandardMaterial({ 
+                color: colors.floor,
+                roughness: 0.8
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            scene.add(floor);
+            room.addObject(floor);
+            
+            // Walls
+            const wallMaterial = new THREE.MeshStandardMaterial({
+                color: colors.walls,
+                roughness: 0.7,
+                emissive: colors.emissive,
+                emissiveIntensity: 0.1
+            });
+            
+            // North wall
+            const northWallGeometry = new THREE.PlaneGeometry(20, 5);
+            const northWall = new THREE.Mesh(northWallGeometry, wallMaterial);
+            northWall.position.z = -10;
+            northWall.position.y = 2.5;
+            scene.add(northWall);
+            room.addObject(northWall);
+            
+            // South wall
+            const southWall = northWall.clone();
+            southWall.position.z = 10;
+            southWall.rotation.y = Math.PI;
+            scene.add(southWall);
+            room.addObject(southWall);
+            
+            // East wall
+            const eastWallGeometry = new THREE.PlaneGeometry(20, 5);
+            const eastWall = new THREE.Mesh(eastWallGeometry, wallMaterial);
+            eastWall.position.x = 10;
+            eastWall.position.y = 2.5;
+            eastWall.rotation.y = -Math.PI / 2;
+            scene.add(eastWall);
+            room.addObject(eastWall);
+            
+            // West wall
+            const westWall = eastWall.clone();
+            westWall.position.x = -10;
+            westWall.rotation.y = Math.PI / 2;
+            scene.add(westWall);
+            room.addObject(westWall);
+            
+            // Add lighting
+            const ambientLight = new THREE.AmbientLight(colors.ambient, 0.5);
+            scene.add(ambientLight);
+            room.addObject(ambientLight);
+            
+            const mainLight = new THREE.PointLight(colors.light, colors.intensity, 20);
+            mainLight.position.set(0, 3, 0);
+            scene.add(mainLight);
+            room.addObject(mainLight);
+            
+            // Add some theme-specific decorations
+            addRoomDecorations(room, theme);
+            
+            // Store the room and update UI
+            rooms[roomIndex - 1] = room;
+            roomStat.textContent = roomIndex;
+            
+            return room;
+        }
+        
+        // Add decorations to the room based on the theme
+        function addRoomDecorations(room, theme) {
+            switch(theme) {
+                case 'fire':
+                    // Add fire pits
+                    addFireDecoration(room, -5, -5);
+                    addFireDecoration(room, 5, -5);
+                    addFireDecoration(room, 5, 5);
+                    addFireDecoration(room, -5, 5);
+                    break;
+                    
+                case 'ice':
+                    // Add ice crystals
+                    addIceDecoration(room, -6, -6);
+                    addIceDecoration(room, 6, -6);
+                    addIceDecoration(room, 6, 6);
+                    addIceDecoration(room, -6, 6);
+                    break;
+                    
+                case 'undead':
+                    // Add gravestones
+                    addUndeadDecoration(room, -7, -7);
+                    addUndeadDecoration(room, 7, -7);
+                    addUndeadDecoration(room, 7, 7);
+                    addUndeadDecoration(room, -7, 7);
+                    break;
+                    
+                case 'mechanical':
+                    // Add mechanical elements
+                    addMechanicalDecoration(room, -7, -7);
+                    addMechanicalDecoration(room, 7, -7);
+                    addMechanicalDecoration(room, 7, 7);
+                    addMechanicalDecoration(room, -7, 7);
+                    break;
+            }
+        }
+        
+        // Add fire decoration (fire pit)
+        function addFireDecoration(room, x, z) {
+            // Fire pit base - reduced segments
+            const baseGeometry = new THREE.CylinderGeometry(1, 1, 0.5, 8);
+            const baseMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x3c1f0e, 
+                roughness: 0.9 
+            });
+            const base = new THREE.Mesh(baseGeometry, baseMaterial);
+            base.position.set(x, 0.25, z);
+            scene.add(base);
+            room.addObject(base);
+            
+            // Fire effect (particle system simulation) - further reduce particles
+            const fireGroup = new THREE.Group();
+            // Reduced number of flames to 5 for better performance
+            for (let i = 0; i < 5; i++) {
+                const flameGeo = new THREE.SphereGeometry(0.2 + Math.random() * 0.3, 4, 4);
+                const flameMat = new THREE.MeshBasicMaterial({ 
+                        color: new THREE.Color(
+                            Math.random() * 0.2 + 0.8, 
+                            Math.random() * 0.5, 
+                            0
+                        ),
+                        transparent: true,
+                        opacity: 0.7
+                    });
+                const flame = new THREE.Mesh(flameGeo, flameMat);
+                
+                // Random position within pit
+                const radius = Math.random() * 0.7;
+                const angle = Math.random() * Math.PI * 2;
+                flame.position.x = radius * Math.cos(angle);
+                flame.position.z = radius * Math.sin(angle);
+                flame.position.y = 0.5 + Math.random() * 0.5;
+                
+                // Store animation parameters
+                flame.userData.baseY = flame.position.y;
+                flame.userData.speed = 0.5 + Math.random() * 0.5;
+                flame.userData.offset = Math.random() * Math.PI * 2;
+                flame.userData.animationType = 'fire';
+                
+                fireGroup.add(flame);
+            }
+            
+            // Only add light if we haven't reached the maximum
+            if (lightCount < maxLights) {
+                // Add fire light with reduced intensity
+                const fireLight = new THREE.PointLight(0xff5500, 0.6, 5);
+                fireLight.position.y = 1;
+                fireGroup.add(fireLight);
+                fireLight.userData.animationType = 'fireLight';
+                lightCount++;
+            }
+            
+            // Position fire group
+            fireGroup.position.set(x, 0, z);
+            scene.add(fireGroup);
+            room.addObject(fireGroup);
+            
+            // Add to global animation tracking
+            animatedObjects.push(fireGroup);
+            
+            return fireGroup;
+        }
+        
+        // Add ice decoration (ice crystal cluster)
+        function addIceDecoration(room, x, z) {
+            // Ice crystal group
+            const crystalGroup = new THREE.Group();
+            
+            // Create several crystals - reduced count
+            for (let i = 0; i < 3; i++) {
+                const height = 0.8 + Math.random() * 2;
+                const radius = 0.2 + Math.random() * 0.3;
+                
+                // Reduced segments
+                const crystalGeo = new THREE.ConeGeometry(radius, height, 5);
+                // Use MeshBasicMaterial instead of MeshStandardMaterial for better performance
+                const crystalMat = new THREE.MeshBasicMaterial({ 
+                    color: 0xaaddff,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+                
+                // Position within cluster
+                const angle = Math.random() * Math.PI * 2;
+                const clusterRadius = Math.random() * 0.8;
+                crystal.position.x = clusterRadius * Math.cos(angle);
+                crystal.position.z = clusterRadius * Math.sin(angle);
+                crystal.position.y = height / 2;
+                
+                // Random rotation
+                crystal.rotation.y = Math.random() * Math.PI * 2;
+                crystal.rotation.x = (Math.random() - 0.5) * 0.5;
+                crystal.rotation.z = (Math.random() - 0.5) * 0.5;
+                
+                crystalGroup.add(crystal);
+            }
+            
+            // Only add light if we haven't reached the maximum
+            if (lightCount < maxLights) {
+                // Add ice light with reduced intensity
+                const iceLight = new THREE.PointLight(0x88ccff, 0.5, 5);
+                iceLight.position.y = 1;
+                crystalGroup.add(iceLight);
+                lightCount++;
+            }
+            
+            // Position crystal group
+            crystalGroup.position.set(x, 0, z);
+            scene.add(crystalGroup);
+            room.addObject(crystalGroup);
+            
+            return crystalGroup;
+        }
+        
+        // Add undead decoration (gravestone/bones)
+        function addUndeadDecoration(room, x, z) {
+            // Gravestone group
+            const graveGroup = new THREE.Group();
+            
+            // Gravestone - simpler geometry
+            const stoneGeo = new THREE.BoxGeometry(1.5, 2, 0.3);
+            stoneGeo.translate(0, 1, 0); // Center at bottom
+            // Using MeshBasicMaterial for better performance
+            const stoneMat = new THREE.MeshBasicMaterial({ 
+                color: 0x777777
+            });
+            const stone = new THREE.Mesh(stoneGeo, stoneMat);
+            
+            // Random rotation
+            stone.rotation.y = (Math.random() - 0.5) * 0.5;
+            stone.rotation.x = (Math.random() - 0.5) * 0.1;
+            stone.rotation.z = (Math.random() - 0.5) * 0.1;
+            
+            graveGroup.add(stone);
+            
+            // Only add light if we haven't reached the maximum
+            if (lightCount < maxLights) {
+                // Add green glow with reduced intensity
+                const graveLight = new THREE.PointLight(0x22ff00, 0.4, 3);
+                graveLight.position.set(0, 0.5, 0.3);
+                graveGroup.add(graveLight);
+                lightCount++;
+                
+                // Add to animation tracking for light pulsing
+                graveLight.userData.animationType = 'undeadLight';
+                animatedObjects.push(graveLight);
+            }
+            
+            // Position grave group
+            graveGroup.position.set(x, 0, z);
+            scene.add(graveGroup);
+            room.addObject(graveGroup);
+            
+            return graveGroup;
+        }
+        
+        // Add mechanical decoration (gear assembly)
+        function addMechanicalDecoration(room, x, z) {
+            // Gear group
+            const gearGroup = new THREE.Group();
+            
+            // Create base - reduced segments
+            const baseGeo = new THREE.CylinderGeometry(1, 1, 0.3, 8);
+            // Use MeshBasicMaterial instead of MeshStandardMaterial
+            const baseMat = new THREE.MeshBasicMaterial({ 
+                color: 0x444444
+            });
+            const base = new THREE.Mesh(baseGeo, baseMat);
+            base.position.y = 0.15;
+            gearGroup.add(base);
+            
+            // Create main gear - reduced segments
+            const mainGearGeo = new THREE.CylinderGeometry(0.8, 0.8, 0.2, 8);
+            const mainGearMat = new THREE.MeshBasicMaterial({ 
+                color: 0xaa8844
+            });
+            const mainGear = new THREE.Mesh(mainGearGeo, mainGearMat);
+            mainGear.position.y = 0.4;
+            mainGear.rotation.y = Math.random() * Math.PI;
+            gearGroup.add(mainGear);
+            
+            // Add fewer teeth to main gear
+            for (let i = 0; i < 8; i++) {
+                const toothGeo = new THREE.BoxGeometry(0.2, 0.2, 0.3);
+                const tooth = new THREE.Mesh(toothGeo, mainGearMat);
+                
+                const angle = (i / 8) * Math.PI * 2;
+                tooth.position.x = 0.8 * Math.cos(angle);
+                tooth.position.z = 0.8 * Math.sin(angle);
+                tooth.position.y = 0.4;
+                tooth.rotation.y = angle;
+                
+                gearGroup.add(tooth);
+            }
+            
+            // Add smaller gear
+            const smallGearGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.15, 8);
+            const smallGear = new THREE.Mesh(smallGearGeo, mainGearMat);
+            smallGear.position.set(0.9, 0.7, 0);
+            smallGear.rotation.y = Math.random() * Math.PI;
+            gearGroup.add(smallGear);
+            
+            // Only add light if we haven't reached the maximum
+            if (lightCount < maxLights) {
+                // Add gear light with reduced intensity
+                const gearLight = new THREE.PointLight(0xffcc33, 0.4, 4);
+                gearLight.position.y = 0.8;
+                gearGroup.add(gearLight);
+                lightCount++;
+            }
+            
+            // Position gear group
+            gearGroup.position.set(x, 0, z);
+            scene.add(gearGroup);
+            room.addObject(gearGroup);
+            
+            // Add gears to animation tracking
+            mainGear.userData.animationType = 'gear';
+            mainGear.userData.rotSpeed = 0.2 + Math.random() * 0.3;
+            smallGear.userData.animationType = 'gear';
+            smallGear.userData.rotSpeed = -mainGear.userData.rotSpeed * 2;
+            
+            animatedObjects.push(mainGear);
+            animatedObjects.push(smallGear);
+            
+            return gearGroup;
+        }
+        
+        // Spawn a door to the next level
+        let exitDoor = null;
+        function spawnNextLevelDoor() {
+            // Create door geometry
+            const doorGroup = new THREE.Group();
+            
+            // Door frame - reduced segments
+            const frameGeo = new THREE.BoxGeometry(3, 4, 0.5);
+            // Use MeshBasicMaterial with emissive color rather than MeshStandardMaterial
+            const frameMat = new THREE.MeshBasicMaterial({ 
+                color: 0x8866aa
+            });
+            const frame = new THREE.Mesh(frameGeo, frameMat);
+            frame.position.y = 2;
+            doorGroup.add(frame);
+            
+            // Door opening (inner part)
+            const openingGeo = new THREE.PlaneGeometry(2, 3);
+            const openingMat = new THREE.MeshBasicMaterial({ 
+                color: 0x000000,
+                transparent: true,
+                opacity: 0.7
+            });
+            const opening = new THREE.Mesh(openingGeo, openingMat);
+            opening.position.z = 0.3;
+            opening.position.y = 1.5;
+            doorGroup.add(opening);
+            
+            // Portal effect - reduced particles
+            const portalGroup = new THREE.Group();
+            // Reduced from 20 to 10 particles
+            for (let i = 0; i < 10; i++) {
+                const particleGeo = new THREE.SphereGeometry(0.05 + Math.random() * 0.05, 4, 4);
+                    const particleMat = new THREE.MeshBasicMaterial({ 
+                    color: new THREE.Color(
+                        0.5 + Math.random() * 0.5,
+                        0.2 + Math.random() * 0.5,
+                        0.5 + Math.random() * 0.5
+                    ),
+                        transparent: true,
+                    opacity: 0.7
+                    });
+                    const particle = new THREE.Mesh(particleGeo, particleMat);
+                    
+                // Random position in portal
+                particle.position.x = (Math.random() - 0.5) * 1.5;
+                particle.position.y = Math.random() * 2;
+                particle.position.z = 0.25;
+                
+                // Store animation parameters
+                particle.userData.basePos = particle.position.clone();
+                particle.userData.speed = 0.5 + Math.random() * 1;
+                    particle.userData.offset = Math.random() * Math.PI * 2;
+                particle.userData.animationType = 'portal';
+                
+                portalGroup.add(particle);
+                animatedObjects.push(particle); // Add to global animation tracking
+            }
+            
+            // Add portal light if we haven't reached max
+            if (lightCount < maxLights) {
+                const portalLight = new THREE.PointLight(0xaa55ff, 0.8, 5);
+                portalLight.position.z = 0.5;
+                portalLight.position.y = 1.5;
+                portalLight.userData.animationType = 'portalLight';
+                
+                portalGroup.add(portalLight);
+                animatedObjects.push(portalLight); // Add to global animation tracking
+                lightCount++;
+            }
+            
+            doorGroup.add(portalGroup);
+            
+            // Position door at north wall
+            doorGroup.position.set(0, 0, -9.5);
+            doorGroup.rotation.y = Math.PI;
+            scene.add(doorGroup);
+            
+            // Store in room objects
+            if (rooms[currentRoomIndex]) {
+                rooms[currentRoomIndex].objects.push(doorGroup);
+            }
+            
+            // Store door reference
+            exitDoor = doorGroup;
+            
+            // Show door message
+            player.showPickupMessage("A portal to the next level has appeared!");
+            
+            return doorGroup;
+        }
+        
+        // Check if player is near the exit door
+        function checkDoorCollision() {
+            if (!exitDoor) return;
+            
+            const doorPos = new THREE.Vector3();
+            exitDoor.getWorldPosition(doorPos);
+            
+            const distance = player.position.distanceTo(doorPos);
+            
+            if (distance < 2) {
+                goToNextLevel();
+            }
+        }
+        
+        // Transition to next level - improved cleanup
+        function goToNextLevel() {
+            // Increment room
+            currentRoomIndex++;
+            updateLevelDisplay();
+            
+            // Reset room array at the new index
+            if (!rooms[currentRoomIndex]) {
+                rooms[currentRoomIndex] = { objects: [] };
+            }
+            
+            // Reset any ongoing timers/intervals if necessary
+            clearBossAttackInterval();
+            
+            // Clear projectiles
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                scene.remove(projectiles[i]);
+                
+                // Cleanup lights
+                projectiles[i].traverse(child => {
+                    if (child instanceof THREE.PointLight) {
+                        lightCount = Math.max(0, lightCount - 1);
+                    }
+                });
+            }
+            projectiles.length = 0;
+            
+            // Clear pickups
+            for (let i = pickups.length - 1; i >= 0; i--) {
+                scene.remove(pickups[i]);
+            }
+            pickups.length = 0;
+            
+            // Remove old boss
+            if (enemy) {
+                scene.remove(enemy.mesh);
+                enemy = null;
+            }
+            
+            // Clear any exit door
+            if (exitDoor) {
+                scene.remove(exitDoor);
+                exitDoor = null;
+            }
+            
+            // Clear all animated objects
+            for (let i = animatedObjects.length - 1; i >= 0; i--) {
+                const obj = animatedObjects[i];
+                if (obj.parent) {
+                    scene.remove(obj.parent);
+                }
+                // For objects that are themselves in the scene
+                if (obj.isObject3D) {
+                    scene.remove(obj);
+                }
+            }
+            animatedObjects.length = 0;
+            
+            // Thorough cleanup - remove all room elements
+            // Clear ALL room decorations from previous rooms
+            for (let roomIdx = 0; roomIdx < currentRoomIndex; roomIdx++) {
+                if (rooms[roomIdx] && rooms[roomIdx].objects) {
+                    rooms[roomIdx].objects.forEach(obj => {
+                        scene.remove(obj);
+                    });
+                    rooms[roomIdx].objects = [];
+                }
+            }
+            
+            // Additional scene cleanup - remove any mesh that's not essential
+            const essentialObjects = [player, camera];
+            scene.children.slice().forEach(object => {
+                if (!essentialObjects.includes(object) && 
+                    !(object instanceof THREE.AmbientLight) && 
+                    !(object instanceof THREE.DirectionalLight)) {
+                    scene.remove(object);
+                }
+            });
+            
+            // Reset light count for the new room
+            lightCount = 0;
+            
+            // Generate new room
+            generateRoom();
+            
+            // Spawn boss
+            spawnBoss();
+        }
+        
+        // Spawn upgrade pickups
+        const pickups = [];
+        function spawnUpgrade() {
+            // Choose random upgrade type
+            const types = [
+                { type: 'weapon', name: 'Plasma Gun' },
+                { type: 'weapon', name: 'Pulse Rifle' },
+                { type: 'weapon', name: 'BFG' },
+                { type: 'stats', strength: 0.5, speed: 0.2 },
+                { type: 'stats', strength: 0.2, speed: 0.5 },
+                { type: 'stats', strength: 0.4, speed: 0.4 }
+            ];
+            
+            // Choose more advanced weapons for higher levels
+            let availableTypes = types;
+            if (currentRoomIndex < 1) {
+                // First level - exclude BFG
+                availableTypes = types.filter(t => t.type !== 'weapon' || t.name !== 'BFG');
+            }
+            
+            const upgrade = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+            
+            // Create pickup mesh
+            const pickupGroup = new THREE.Group();
+            
+            // Base
+            const baseGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.1, 16);
+            const baseMat = new THREE.MeshStandardMaterial({ 
+                color: 0x333333,
+                metalness: 0.7,
+                roughness: 0.3
+            });
+            const base = new THREE.Mesh(baseGeo, baseMat);
+            pickupGroup.add(base);
+            
+            // Floating item
+            let itemGeo, itemMat;
+            if (upgrade.type === 'weapon') {
+                // Weapon pickup
+                itemGeo = new THREE.BoxGeometry(0.4, 0.2, 0.8);
+                itemMat = new THREE.MeshStandardMaterial({ 
+                    color: 0x3366ff,
+                    emissive: 0x0033cc,
+                    emissiveIntensity: 0.5,
+                    metalness: 0.8,
+                    roughness: 0.2
+                });
+                    } else {
+                // Stat pickup
+                itemGeo = new THREE.SphereGeometry(0.3, 16, 16);
+                itemMat = new THREE.MeshStandardMaterial({ 
+                    color: 0xffcc00,
+                    emissive: 0xff6600,
+                    emissiveIntensity: 0.5,
+                    metalness: 0.5,
+                    roughness: 0.3
+                });
+            }
+            
+            const item = new THREE.Mesh(itemGeo, itemMat);
+            item.position.y = 0.5;
+            pickupGroup.add(item);
+            
+            // Add light
+            const pickupLight = new THREE.PointLight(
+                upgrade.type === 'weapon' ? 0x3366ff : 0xffcc00, 
+                0.7, 
+                3
+            );
+            pickupLight.position.y = 0.5;
+            pickupGroup.add(pickupLight);
+            
+            // Position pickup - random location in room
+            const x = (Math.random() - 0.5) * 16;
+            const z = (Math.random() - 0.5) * 16;
+            pickupGroup.position.set(x, 0, z);
+            
+            // Add to scene
+            scene.add(pickupGroup);
+            
+            // Store in room objects if available
+            if (rooms[currentRoomIndex]) {
+                rooms[currentRoomIndex].objects.push(pickupGroup);
+            }
+            
+            // Store pickup data
+            pickupGroup.userData = {
+                type: upgrade.type,
+                ...upgrade
+            };
+            
+            // Add to pickups array
+            pickups.push(pickupGroup);
+            
+            // Animate pickup
+            const startTime = Date.now();
+            function animatePickup() {
+                if (!pickupGroup.parent) return; // Stop if removed
+                
+                const time = Date.now() * 0.001;
+                
+                // Hover and rotate
+                item.position.y = 0.5 + Math.sin(time * 1.5) * 0.15;
+                item.rotation.y = time * 0.5;
+                
+                // Pulse light
+                if (pickupLight) {
+                    pickupLight.intensity = 0.5 + Math.sin(time * 2) * 0.2;
+                }
+                
+                requestAnimationFrame(animatePickup);
+            }
+            
+            animatePickup();
+            
+            return pickupGroup;
+        }
+        
+        // Check pickup collisions
+        function checkPickupCollisions() {
+            for (let i = pickups.length - 1; i >= 0; i--) {
+                const pickup = pickups[i];
+                const distance = player.position.distanceTo(pickup.position);
+                
+                if (distance < 1.5) {
+                    // Collect pickup based on type
+                    if (pickup.userData.type === 'weapon') {
+                        player.collectWeapon(pickup.userData.name);
+                    } else if (pickup.userData.type === 'stats') {
+                        player.addStats({
+                            strength: pickup.userData.strength || 0,
+                            speed: pickup.userData.speed || 0
+                        });
+                    }
+                    
+                    // Remove from scene and array
+                    scene.remove(pickup);
+                    pickups.splice(i, 1);
+                }
+            }
+        }
+        
+        // Create player
+        function createPlayer() {
+            player = {
+                health: 100,
+                maxHealth: 100,
+                strength: 1,
+                speed: 1,
+                baseSpeed: 0.15,
+                canShoot: true,
+                shootCooldown: 500, // milliseconds
+                damage: 20,
+                position: new THREE.Vector3(),
+                velocity: new THREE.Vector3(),
+                radius: 0.5,
+                invulnerable: false,
+                weapon: 'Basic Sword', // Changed from 'Blaster' to 'Basic Sword'
+                
+                update: function(deltaTime) {
+                    // Get camera direction
+                    const direction = new THREE.Vector3();
+                    camera.getWorldDirection(direction);
+                    direction.y = 0;
+                    direction.normalize();
+                    
+                    // Calculate movement
+                    const sideDirection = new THREE.Vector3(-direction.z, 0, direction.x);
+                    
+                    // Reset velocity
+                    this.velocity.set(0, 0, 0);
+                    
+                    // Apply movement with speed modifier
+                    const speedFactor = this.baseSpeed * this.speed;
+                    
+                    if (moveForward) {
+                        this.velocity.add(direction.multiplyScalar(speedFactor));
+                    }
+                    if (moveBackward) {
+                        this.velocity.add(direction.multiplyScalar(-speedFactor));
+                    }
+                    if (moveLeft) {
+                        this.velocity.add(sideDirection.multiplyScalar(-speedFactor));
+                    }
+                    if (moveRight) {
+                        this.velocity.add(sideDirection.multiplyScalar(speedFactor));
+                    }
+                    
+                    // Update position
+                    camera.position.add(this.velocity);
+                    
+                    // Keep player within room bounds
+                    camera.position.x = Math.max(-9.5, Math.min(9.5, camera.position.x));
+                    camera.position.z = Math.max(-9.5, Math.min(9.5, camera.position.z));
+                    
+                    // Update player position
+                    this.position.copy(camera.position);
+                },
+                
+                takeDamage: function(amount) {
+                    if (this.invulnerable) return;
+                    
+                    this.health -= amount;
+                    if (this.health < 0) this.health = 0;
+                    
+                    // Update health bar
+                    healthFill.style.width = (this.health / this.maxHealth * 100) + '%';
+                    
+                    // Show damage overlay
+                    damageOverlay.style.opacity = 0.7;
+                setTimeout(() => {
+                        damageOverlay.style.opacity = 0;
+                    }, 300);
+                    
+                    // Check if dead
+                    if (this.health <= 0) {
+                        gameOver();
+                    } else {
+                        // Temporary invulnerability
+                        this.invulnerable = true;
+                        setTimeout(() => {
+                            this.invulnerable = false;
+                        }, 500);
+                    }
+                },
+                
+                attackWithSword: function() {
+                    return this.shoot();
+                },
+                
+                shoot: function() {
+                    if (!this.canShoot) return;
+                    
+                    // Set cooldown based on weapon
+                    this.canShoot = false;
+                    setTimeout(() => { this.canShoot = true; }, this.getWeaponInfo().cooldown);
+                    
+                    // Get weapon properties
+                    const weaponInfo = this.getWeaponInfo();
+                    
+                    // Create sword swing effect - pass enemy detection to animation function
+                    // instead of doing damage immediately
+                    this.createSwordSwingEffect(weaponInfo);
+                    
+                    // Damage will be applied during the swing animation
+                },
+                
+                createSwordSwingEffect: function(weaponInfo) {
+                    // Create visual sword swing effect
+                    const swingGroup = new THREE.Group();
+                    
+                    // Create sword blade using a box
+                    const bladeGeo = new THREE.BoxGeometry(0.1, 0.8, 0.2);
+                    const bladeMat = new THREE.MeshBasicMaterial({ 
+                        color: weaponInfo.color,
+                        transparent: true,
+                        opacity: 0.7
+                    });
+                    const blade = new THREE.Mesh(bladeGeo, bladeMat);
+                    blade.position.y = 0; // Center of blade
+                    swingGroup.add(blade);
+                    
+                    // Create sword handle
+                    const handleGeo = new THREE.BoxGeometry(0.05, 0.2, 0.05);
+                    const handleMat = new THREE.MeshBasicMaterial({ color: 0x8B4513 });
+                    const handle = new THREE.Mesh(handleGeo, handleMat);
+                    handle.position.y = -0.5; // Below blade
+                    swingGroup.add(handle);
+                    
+                    // Add sword guard (crossguard)
+                    const guardGeo = new THREE.BoxGeometry(0.3, 0.05, 0.1);
+                    const guardMat = new THREE.MeshBasicMaterial({ color: 0x8B4513 });
+                    const guard = new THREE.Mesh(guardGeo, guardMat);
+                    guard.position.y = -0.4; // Between blade and handle
+                    swingGroup.add(guard);
+
+                    // Create player hand holding the sword
+                    const handGeo = new THREE.SphereGeometry(0.12, 8, 8);
+                    const handMat = new THREE.MeshBasicMaterial({ color: 0xFFD700 }); // Simple gold color for glove
+                    const hand = new THREE.Mesh(handGeo, handMat);
+                    hand.position.y = -0.6; // At the end of handle
+                    hand.position.x = 0.05; // Slightly offset to show hand
+                    swingGroup.add(hand);
+                    
+                    // Add to scene - will position during animation
+                    scene.add(swingGroup);
+                    
+                    // Add trail effect for swing arc
+                    const trailCount = 8;
+                    const trails = [];
+                    for (let i = 0; i < trailCount; i++) {
+                        const trailGeo = new THREE.BoxGeometry(0.05, 0.6, 0.1);
+                        const trailMat = new THREE.MeshBasicMaterial({ 
+                            color: weaponInfo.color,
+                            transparent: true,
+                            opacity: 0.3 - (i * 0.03)
+                        });
+                        const trail = new THREE.Mesh(trailGeo, trailMat);
+                        trail.visible = false;
+                        swingGroup.add(trail);
+                        trails.push(trail);
+                    }
+                    
+                    // Add light effect if we have room for it
+                    let light = null;
+                    if (lightCount < maxLights) {
+                        light = new THREE.PointLight(weaponInfo.color, 0.7, 2);
+                        swingGroup.add(light);
+                        lightCount++;
+                    }
+                    
+                    // Animate swing and remove after animation
+                    const startTime = Date.now();
+                    const swingDuration = 400; // milliseconds - slightly longer for more dramatic effect
+                    
+                    // Store last positions for trail effect
+                    const lastPositions = [];
+                    
+                    // Flag to track if damage has been applied
+                    let damageApplied = false;
+                    // Track when damage should be applied (around 65-70% of animation)
+                    const damageTime = swingDuration * 0.65;
+                    
+                    function animateSwing() {
+                        const elapsed = Date.now() - startTime;
+                        if (elapsed < swingDuration) {
+                            // Calculate swing progress (0 to 1)
+                            const progress = elapsed / swingDuration;
+                            
+                            // Get current camera direction and position
+                            const direction = new THREE.Vector3();
+                            camera.getWorldDirection(direction);
+                            
+                            // Calculate right vector relative to camera
+                            const right = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(0, 1, 0)).normalize();
+                            
+                            // Position sword relative to the camera
+                            // 1. Start with camera position
+                            swingGroup.position.copy(camera.position);
+                            
+                            // 2. Position to the right and down as if player is holding it
+                            const handOffset = 0.6; // Distance from camera center where hand would be
+                            swingGroup.position.add(right.clone().multiplyScalar(0.4)); // Right side
+                            swingGroup.position.y -= 0.3; // Lower position as if holding sword
+                            
+                            // 3. Add forward offset to place sword in front of player
+                            swingGroup.position.add(direction.clone().multiplyScalar(1.0));
+                            
+                            // Sword slash animation - swing from "ready" position through center cursor to left side
+                            // Start: bottom right, End: top left
+                            // This creates a diagonal upward slash through the center crosshair
+                            
+                            // Calculate animation path
+                            const swingAngle = Math.PI * 0.9; // ~160 degree arc
+                            let currentRotation;
+                            
+                            if (progress < 0.5) {
+                                // First half - rearing back for the slash
+                                const prepProgress = progress * 2; // 0 to 1 during first half
+                                currentRotation = -Math.PI/4 - (prepProgress * Math.PI/6);
+                                
+                                // Adjust position to simulate rearing back
+                                swingGroup.position.add(right.clone().multiplyScalar(0.2 * prepProgress));
+                                swingGroup.position.y -= 0.1 * prepProgress;
+                            } else {
+                                // Second half - actual slashing motion through cursor
+                                const slashProgress = (progress - 0.5) * 2; // 0 to 1 during second half
+                                
+                                // Swing from rear position through crosshair to end position
+                                currentRotation = -Math.PI/4 - Math.PI/6 + (slashProgress * swingAngle);
+                                
+                                // Move sword through center of screen
+                                swingGroup.position.add(right.clone().multiplyScalar(-0.8 * slashProgress));
+                                swingGroup.position.y += 0.3 * slashProgress;
+                                
+                                // Apply damage during the middle of the swing (when sword passes through center)
+                                // Only apply damage once during the animation
+                                if (!damageApplied && elapsed >= damageTime) {
+                                    damageApplied = true;
+                                    
+                                    // Check for enemies in range with a forward-facing cone
+                                    if (enemy && enemy.health > 0) {
+                                        // Get direction and position for sword attack
+                                        const attackDirection = new THREE.Vector3();
+                                        camera.getWorldDirection(attackDirection);
+                                        
+                                        // Get distance to enemy
+                                        const distanceToEnemy = player.position.distanceTo(enemy.mesh.position);
+                                        
+                                        // Check if enemy is in front of player (dot product > 0)
+                                        const toEnemy = new THREE.Vector3()
+                                            .subVectors(enemy.mesh.position, player.position)
+                                            .normalize();
+                                        const angleToEnemy = attackDirection.dot(toEnemy);
+                                        
+                                        // More lenient hit detection:
+                                        // - Increased effective range for larger bosses
+                                        // - Reduced angle requirement for easier hits
+                                        // - Added a small bonus to the hitbox size
+                                        const hitboxBonus = 0.5; // Additional bonus to hit detection
+                                        
+                                        // If enemy is in range (distance) and in front (angle)
+                                        // Note: lower arc values mean a wider angle is acceptable
+                                        if (distanceToEnemy < (weaponInfo.range + hitboxBonus) && angleToEnemy > (weaponInfo.arc - 0.1)) {
+                                            // Apply damage directly
+                                            enemy.takeDamage(weaponInfo.damage * player.strength);
+                                            
+                                            // Show hit effect
+                                            player.createHitEffect(enemy.mesh.position);
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Apply rotation to sword
+                            swingGroup.lookAt(camera.position.clone().add(direction));
+                            swingGroup.rotateOnAxis(new THREE.Vector3(0, 0, 1), currentRotation);
+                            
+                            // Update trail effect
+                            if (progress > 0.5) { // Only show trail during actual slash
+                                const bladePos = new THREE.Vector3();
+                                blade.getWorldPosition(bladePos);
+                                
+                                lastPositions.unshift({
+                                    position: blade.position.clone(),
+                                    quaternion: swingGroup.quaternion.clone()
+                                });
+                                
+                                // Limit trail length
+                                if (lastPositions.length > trailCount) {
+                                    lastPositions.pop();
+                                }
+                                
+                                // Update trail meshes
+                                for (let i = 0; i < lastPositions.length && i < trails.length; i++) {
+                                    const trail = trails[i];
+                                    trail.visible = true;
+                                    trail.position.copy(lastPositions[i].position);
+                                    trail.quaternion.copy(lastPositions[i].quaternion);
+                                    
+                                    // Fade out based on how old the position is
+                                    trail.material.opacity = 0.3 * (1 - (i / trailCount));
+                                }
+                            }
+                            
+                            // Fade out toward end of animation
+                            if (elapsed > swingDuration * 0.8) {
+                                const fade = 1 - ((elapsed - (swingDuration * 0.8)) / (swingDuration * 0.2));
+                                blade.material.opacity = fade * 0.7;
+                                // Also fade trails
+                                trails.forEach(trail => {
+                                    if (trail.visible) {
+                                        trail.material.opacity *= fade;
+                                    }
+                                });
+                                // Fade light
+                                if (light) {
+                                    light.intensity = 0.7 * fade;
+                                }
+                            }
+                            
+                            requestAnimationFrame(animateSwing);
+                        } else {
+                            // Clean up when done
+                            scene.remove(swingGroup);
+                            // Reduce light count if we added one
+                            if (light) {
+                                lightCount = Math.max(0, lightCount - 1);
+                            }
+                        }
+                    }
+                    
+                    animateSwing();
+                },
+                
+                createHitEffect: function(position) {
+                    // Create hit effect at enemy position
+                    const hitGroup = new THREE.Group();
+                    
+                    // Create several particles for hit effect
+                    for (let i = 0; i < 5; i++) {
+                        const particleGeo = new THREE.SphereGeometry(0.05 + Math.random() * 0.05, 4, 4);
+                        const particleMat = new THREE.MeshBasicMaterial({
+                            color: 0xff0000,
+                            transparent: true,
+                            opacity: 0.8
+                        });
+                        const particle = new THREE.Mesh(particleGeo, particleMat);
+                        
+                        // Random position around hit point
+                        particle.position.set(
+                            (Math.random() - 0.5) * 0.3,
+                            (Math.random() - 0.5) * 0.3,
+                            (Math.random() - 0.5) * 0.3
+                        );
+                        
+                        // Random velocity
+                        particle.userData.velocity = new THREE.Vector3(
+                            (Math.random() - 0.5) * 0.05,
+                            (Math.random() - 0.5) * 0.05 + 0.02,
+                            (Math.random() - 0.5) * 0.05
+                        );
+                        
+                        hitGroup.add(particle);
+                    }
+                    
+                    // Position at hit location
+                    hitGroup.position.copy(position);
+                    
+                    // Add to scene
+                    scene.add(hitGroup);
+                    
+                    // Animate particles
+                    const startTime = Date.now();
+                    const effectDuration = 500; // milliseconds
+                    
+                    function animateParticles() {
+                        const elapsed = Date.now() - startTime;
+                        if (elapsed < effectDuration) {
+                            // Move particles outward
+                            hitGroup.children.forEach(particle => {
+                                particle.position.add(particle.userData.velocity);
+                                
+                                // Fade out
+                                const fade = 1 - (elapsed / effectDuration);
+                                if (particle.material) {
+                                    particle.material.opacity = fade * 0.8;
+                                }
+                            });
+                            
+                            requestAnimationFrame(animateParticles);
+                        } else {
+                            // Clean up when done
+                            scene.remove(hitGroup);
+                        }
+                    }
+                    
+                    animateParticles();
+                },
+                
+                getWeaponInfo: function() {
+                    // Different sword types with properties
+                    const weapons = {
+                        'Basic Sword': {
+                            damage: 25,
+                            cooldown: 600,
+                            range: 3.0, // Increased from 2.5
+                            arc: 0.5, // Reduced from 0.6 - smaller value means wider angle
+                            color: 0xcccccc
+                        },
+                        'Fire Blade': {
+                            damage: 40,
+                            cooldown: 700,
+                            range: 3.5, // Increased from 3.0
+                            arc: 0.6, // Reduced from 0.7
+                            color: 0xff5500
+                        },
+                        'Ice Saber': {
+                            damage: 30,
+                            cooldown: 400, // Faster attacks
+                            range: 3.3, // Increased from 2.8
+                            arc: 0.55, // Reduced from 0.65
+                            color: 0x00ccff
+                        },
+                        'Soul Reaver': {
+                            damage: 70,
+                            cooldown: 900,
+                            range: 4.0, // Increased from 3.5
+                            arc: 0.7, // Reduced from 0.8
+                            color: 0x9933ff
+                        }
+                    };
+                    
+                    return weapons[this.weapon] || weapons['Basic Sword'];
+                },
+                
+                collectWeapon: function(weaponName) {
+                    this.weapon = weaponName;
+                    currentWeapon.textContent = weaponName;
+                    
+                    // Show pickup message
+                    this.showPickupMessage(`New weapon: ${weaponName}`);
+                },
+                
+                addStats: function(stats) {
+                    this.strength += stats.strength || 0;
+                    this.speed += stats.speed || 0;
+                    
+                    // Update UI
+                    strengthStat.textContent = this.strength.toFixed(1);
+                    speedStat.textContent = this.speed.toFixed(1);
+                    
+                    // Show pickup message
+                    this.showPickupMessage(`Stats increased: +${stats.strength || 0} Strength, +${stats.speed || 0} Speed`);
+                },
+                
+                showPickupMessage: function(message) {
+                    pickupMessage.textContent = message;
+                    pickupMessage.style.opacity = 1;
+                    pickupMessage.classList.remove('fadeOut');
+                    
+                    // Force a reflow to restart animation
+                    void pickupMessage.offsetWidth;
+                    
+                    setTimeout(() => {
+                        pickupMessage.classList.add('fadeOut');
+                    }, 50);
+                }
+            };
+            
+            return player;
+        }
+        
+        // Create enemy boss
+        function createBoss(theme = 'fire', difficulty = 1) {
+            // Determine boss properties based on theme
+            const bossTypes = {
+                    fire: {
+                    name: 'Inferno Overlord',
+                    color: 0xff3300,
+                    attackType: 'ranged',
+                    attackDamage: 10 * difficulty,
+                    attackSpeed: 2 - (difficulty * 0.1),
+                    scale: 1 + (difficulty * 0.2)
+                    },
+                    ice: {
+                    name: 'Frost Monarch',
+                    color: 0x33ccff,
+                    attackType: 'melee',
+                    attackDamage: 15 * difficulty,
+                    attackSpeed: 3 - (difficulty * 0.2),
+                    scale: 0.8 + (difficulty * 0.15)
+                    },
+                    undead: {
+                    name: 'Necro Lord',
+                    color: 0x660066,
+                    attackType: 'summon',
+                    attackDamage: 8 * difficulty,
+                    attackSpeed: 4 - (difficulty * 0.3),
+                    scale: 0.9 + (difficulty * 0.18)
+                    },
+                    mechanical: {
+                    name: 'Clockwork Titan',
+                    color: 0xccaa00,
+                    attackType: 'aoe',
+                    attackDamage: 12 * difficulty,
+                    attackSpeed: 2.5 - (difficulty * 0.15),
+                    scale: 1.2 + (difficulty * 0.25)
+                }
+            };
+            
+            // Use fire boss as default
+            const bossType = bossTypes[theme] || bossTypes.fire;
+            
+            // Create boss mesh
+            const bossGroup = new THREE.Group();
+            
+            // Body
+            const bodyGeometry = new THREE.SphereGeometry(1, 16, 16);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ 
+                color: bossType.color,
+                emissive: bossType.color,
+                emissiveIntensity: 0.5,
+                roughness: 0.7
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 1.5;
+            bossGroup.add(body);
+            
+            // Head
+            const headGeometry = new THREE.SphereGeometry(0.7, 16, 16);
+            const headMaterial = new THREE.MeshStandardMaterial({ 
+                color: bossType.color,
+                emissive: bossType.color,
+                emissiveIntensity: 0.7,
+                roughness: 0.5
+            });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 2.7;
+            bossGroup.add(head);
+            
+            // Eyes
+            const eyeGeometry = new THREE.SphereGeometry(0.15, 8, 8);
+            const eyeMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff 
+            });
+            const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            leftEye.position.set(-0.25, 2.8, 0.5);
+            bossGroup.add(leftEye);
+            
+            const rightEye = leftEye.clone();
+            rightEye.position.set(0.25, 2.8, 0.5);
+            bossGroup.add(rightEye);
+            
+            // Add light
+            const light = new THREE.PointLight(bossType.color, 1, 10);
+            light.position.set(0, 2, 0);
+            bossGroup.add(light);
+            
+            // Scale boss
+            bossGroup.scale.set(bossType.scale, bossType.scale, bossType.scale);
+            
+            // Add to scene
+            bossGroup.position.set(0, 0, -7);
+            scene.add(bossGroup);
+            
+            // Create boss object
+            const boss = {
+                mesh: bossGroup,
+                theme: theme,
+                name: bossType.name,
+                attackType: bossType.attackType,
+                color: bossType.color,
+                health: 100 * difficulty,
+                maxHealth: 100 * difficulty,
+                speed: 0.03,
+                damage: bossType.attackDamage,
+                attackRange: 1.5,
+                attackCooldown: 1000 / bossType.attackSpeed,
+                attackTimer: 0,
+                canAttack: true,
+                difficulty: difficulty,
+                scale: bossType.scale,
+                radius: 2.0 * bossType.scale, // Increased from 1.5 to 2.0 for larger hitbox
+                alive: true,
+                position: new THREE.Vector3(0, 0, -7),
+                projectiles: [],
+                
+                update: function(deltaTime) {
+                    if (!this.alive) return;
+                    
+                    // Update position of the boss's logical position
+                    this.position.copy(this.mesh.position);
+                    this.position.y = 0; // Keep ground-level for collision
+                    
+                    // Move towards player
+                    const direction = new THREE.Vector3();
+                    direction.subVectors(player.position, this.position);
+                    direction.y = 0; // Keep on ground
+                    
+                    // Only move if player is more than attack range away
+                    const distance = direction.length();
+                    if (distance > this.attackRange) {
+                        direction.normalize();
+                        this.mesh.position.add(direction.multiplyScalar(this.speed));
+                    }
+                    
+                    // Look at player
+                    const lookPoint = new THREE.Vector3(player.position.x, this.mesh.position.y, player.position.z);
+                    this.mesh.lookAt(lookPoint);
+                    
+                    // Update attack timer
+                    this.attackTimer += deltaTime * 1000;
+                    if (this.attackTimer >= this.attackCooldown) {
+                        try {
+                            this.attack(distance);
+                            this.attackTimer = 0;
+                        } catch (e) {
+                            console.error("Error in boss attack:", e);
+                            this.attackTimer = 0; // Reset timer to prevent spam errors
+                        }
+                    }
+                    
+                    // Update projectiles if this boss uses them
+                    try {
+                        this.updateProjectiles(deltaTime);
+                    } catch (e) {
+                        console.error("Error updating boss projectiles:", e);
+                    }
+                },
+                
+                attack: function(distanceToPlayer) {
+                    if (!this.alive) return;
+                    
+                    switch(this.attackType) {
+                        case 'melee':
+                            // Only damage if in range
+                            if (distanceToPlayer <= this.attackRange) {
+                                player.takeDamage(this.damage);
+                                
+                                // Show attack effect
+                                messageEl.textContent = `${this.name} strikes you!`;
+                                messageEl.style.display = 'block';
+                                messageEl.style.opacity = '1';
+                                setTimeout(() => {
+                                    messageEl.style.opacity = '0';
+                                }, 1000);
+                            }
+                            break;
+                            
+                        case 'ranged':
+                            // Fire a projectile
+                            this.fireProjectile();
+                            break;
+                            
+                        case 'aoe':
+                            // Area effect attack
+                            if (distanceToPlayer <= this.attackRange * 2) {
+                                player.takeDamage(this.damage * 0.7);
+                                
+                                // Show ground impact
+                                this.createAOEEffect();
+                                
+                                // Show attack effect
+                                messageEl.textContent = `${this.name} unleashes a shock wave!`;
+                                messageEl.style.display = 'block';
+                                messageEl.style.opacity = '1';
+                                setTimeout(() => {
+                                    messageEl.style.opacity = '0';
+                                }, 1000);
+                            }
+                            break;
+                            
+                        case 'summon':
+                            // Not implementing full summon mechanics for simplicity
+                            // Just do a ranged attack for now
+                            this.fireProjectile();
+                            break;
+                    }
+                },
+                
+                fireProjectile: function() {
+                    try {
+                        // Get projectile from pool
+                        const projectile = projectilePool.getProjectile(true);
+                        
+                        // Position at boss's "mouth" level
+                        projectile.position.copy(this.mesh.position);
+                        projectile.position.y = 2.5 * this.scale;
+                        projectile.visible = true;
+                        
+                        // Direction towards player with slight randomness
+                        const direction = new THREE.Vector3();
+                        direction.subVectors(player.position, projectile.position);
+                        direction.normalize();
+                        
+                        // Add slight randomness
+                        direction.x += (Math.random() - 0.5) * 0.1;
+                        direction.y += (Math.random() - 0.5) * 0.1;
+                        direction.z += (Math.random() - 0.5) * 0.1;
+                        direction.normalize();
+                    
+                    // Add to scene
+                        scene.add(projectile);
+                        
+                        // Store data
+                        projectile.userData.direction = direction;
+                        projectile.userData.speed = 0.2;
+                        projectile.userData.damage = this.damage;
+                        projectile.userData.lifetime = 3000;
+                        projectile.userData.born = Date.now();
+                        projectile.userData.isEnemy = true;
+                        
+                        // Add to boss projectiles
+                        this.projectiles.push(projectile);
+                    } catch (e) {
+                        // Fallback to old projectile creation if pool fails
+                        console.warn("Boss projectile pool failed, using fallback:", e);
+                        
+                        // Create projectile
+                        const projectileGeometry = new THREE.SphereGeometry(0.2, 4, 4);
+                        const projectileMaterial = new THREE.MeshBasicMaterial({ 
+                            color: this.color
+                        });
+                        const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+                        
+                        // Position at boss's "mouth" level
+                        projectile.position.copy(this.mesh.position);
+                        projectile.position.y = 2.5 * this.scale;
+                        
+                        // Direction towards player with slight randomness
+                        const direction = new THREE.Vector3();
+                        direction.subVectors(player.position, projectile.position);
+                        direction.normalize();
+                        
+                        // Add slight randomness
+                        direction.x += (Math.random() - 0.5) * 0.1;
+                        direction.y += (Math.random() - 0.5) * 0.1;
+                        direction.z += (Math.random() - 0.5) * 0.1;
+                        direction.normalize();
+                        
+                        // Add to scene
+                        scene.add(projectile);
+                        
+                        // Store data
+                        projectile.userData.direction = direction;
+                        projectile.userData.speed = 0.2;
+                        projectile.userData.damage = this.damage;
+                        projectile.userData.lifetime = 3000;
+                        projectile.userData.born = Date.now();
+                        
+                        // Add to boss projectiles
+                        this.projectiles.push(projectile);
+                    }
+                    
+                    // Show attack effect
+                    messageEl.textContent = `${this.name} shoots at you!`;
+                    messageEl.style.display = 'block';
+                    messageEl.style.opacity = '1';
+                    setTimeout(() => {
+                        messageEl.style.opacity = '0';
+                    }, 1000);
+                },
+                
+                createAOEEffect: function() {
+                    // Create ring effect on the ground
+                    const ringGeometry = new THREE.RingGeometry(0.5, 3, 32);
+                    const ringMaterial = new THREE.MeshBasicMaterial({ 
+                        color: this.color,
+                            transparent: true,
+                        opacity: 0.7,
+                        side: THREE.DoubleSide
+                    });
+                    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                    ring.position.copy(this.mesh.position);
+                    ring.position.y = 0.05;
+                    ring.rotation.x = -Math.PI / 2;
+                    
+                    // Add to scene
+                    scene.add(ring);
+                    
+                    // Animate and remove
+                    const startTime = Date.now();
+                    const duration = 1000;
+                    
+                    function animateRing() {
+                        const elapsed = Date.now() - startTime;
+                        const progress = elapsed / duration;
+                        
+                        if (progress < 1) {
+                            // Scale up and fade out
+                            ring.scale.set(1 + progress * 2, 1 + progress * 2, 1);
+                            ringMaterial.opacity = 0.7 * (1 - progress);
+                            
+                            requestAnimationFrame(animateRing);
+                        } else {
+                            // Remove when done
+                            scene.remove(ring);
+                        }
+                    }
+                    
+                    animateRing();
+                },
+                
+                updateProjectiles: function(deltaTime) {
+                    const now = Date.now();
+                    
+                    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+                        const projectile = this.projectiles[i];
+                        
+                        // Move projectile
+                        projectile.position.add(
+                            projectile.userData.direction.clone().multiplyScalar(projectile.userData.speed)
+                        );
+                        
+                        // Check for player collision
+                        const distance = projectile.position.distanceTo(player.position);
+                        if (distance < player.radius + 0.2) {
+                            // Hit player
+                            player.takeDamage(projectile.userData.damage);
+                            
+                            // Return projectile to pool
+                            try {
+                                projectilePool.releaseProjectile(projectile);
+                            } catch (e) {
+                                console.warn("Could not release boss projectile to pool:", e);
+                                scene.remove(projectile);
+                            }
+                            this.projectiles.splice(i, 1);
+                            continue;
+                        }
+                        
+                        // Check for wall collision
+                        if (
+                            projectile.position.x > 9.5 || projectile.position.x < -9.5 ||
+                            projectile.position.z > 9.5 || projectile.position.z < -9.5
+                        ) {
+                            try {
+                                projectilePool.releaseProjectile(projectile);
+                            } catch (e) {
+                                console.warn("Could not release boss projectile to pool:", e);
+                                scene.remove(projectile);
+                            }
+                            this.projectiles.splice(i, 1);
+                            continue;
+                        }
+                        
+                        // Check lifetime
+                        if (now - projectile.userData.born > projectile.userData.lifetime) {
+                            try {
+                                projectilePool.releaseProjectile(projectile);
+                            } catch (e) {
+                                console.warn("Could not release boss projectile to pool:", e);
+                                scene.remove(projectile);
+                            }
+                            this.projectiles.splice(i, 1);
+                        }
+                    }
+                },
+                
+                takeDamage: function(amount) {
+                    if (!this.alive) return;
+                    
+                    this.health -= amount;
+                    if (this.health < 0) this.health = 0;
+                    
+                    // Update boss health bar - ensure it's visible
+                    bossHealthBar.style.display = 'block';
+                    bossHealthFill.style.width = (this.health / this.maxHealth * 100) + '%';
+                    
+                    if (this.health <= 0) {
+                        // Boss defeated
+                        this.alive = false;
+                        
+                        // Change appearance
+                        const meshes = [];
+                        this.mesh.traverse(child => {
+                            if (child instanceof THREE.Mesh) {
+                                meshes.push(child);
+                            }
+                        });
+                        
+                        meshes.forEach(mesh => {
+                            if (mesh.material) {
+                                mesh.material.color.set(0x333333);
+                                if (mesh.material.emissive) {
+                                    mesh.material.emissive.set(0x000000);
+                                }
+                            }
+                        });
+                        
+                        // Show victory message
+                        messageEl.textContent = `${this.name} defeated!`;
+                        messageEl.style.display = 'block';
+                        messageEl.style.opacity = '1';
+                        
+                        // Hide boss UI
+                        setTimeout(() => {
+                            bossHealthBar.style.display = 'none';
+                            bossNameElement.style.display = 'none';
+                        }, 2000);
+                        
+                        // Spawn door to next level
+                        spawnNextLevelDoor();
+                        
+                        // Spawn upgrade pickup
+                        spawnUpgrade();
+                    } else {
+                        // Flash on hit
+                        const meshes = [];
+                        this.mesh.traverse(child => {
+                            if (child instanceof THREE.Mesh) {
+                                meshes.push(child);
+                            }
+                        });
+                        
+                        const originalColors = meshes.map(mesh => 
+                            mesh.material ? mesh.material.color.clone() : null
+                        );
+                        
+                        meshes.forEach(mesh => {
+                            if (mesh.material) {
+                                mesh.material.color.set(0xffffff);
+                            }
+                        });
+                        
+                        setTimeout(() => {
+                            meshes.forEach((mesh, index) => {
+                                if (mesh.material && originalColors[index]) {
+                                    mesh.material.color.copy(originalColors[index]);
+                                }
+                            });
+                        }, 100);
+                    }
+                },
+                
+                showBossUI: function() {
+                    // Show boss UI
+                    bossHealthBar.style.display = 'block';
+                    bossHealthFill.style.width = (this.health / this.maxHealth * 100) + '%';
+                    bossNameElement.style.display = 'block';
+                    bossNameElement.textContent = this.name;
+                    
+                    // Show introduction message
+                    messageEl.textContent = `${this.name} appears!`;
+                    messageEl.style.display = 'block';
+                    messageEl.style.opacity = '1';
+                    setTimeout(() => {
+                        messageEl.style.opacity = '0';
+                    }, 2000);
+                }
+            };
+            
+            return boss;
+        }
+        
+        // Update projectiles function (change to only handle boss projectiles)
+        function updateProjectiles() {
+            // Since player no longer uses projectiles, this only handles boss projectiles
+            const now = Date.now();
+            
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const projectile = projectiles[i];
+                
+                // Check if it's an enemy/boss projectile (all remaining projectiles are from the boss)
+                projectile.position.add(projectile.userData.direction.clone().multiplyScalar(projectile.userData.speed));
+                
+                // Check for lifetime
+                if (now - projectile.userData.born > projectile.userData.lifetime) {
+                    scene.remove(projectile);
+                    projectiles.splice(i, 1);
+                    continue;
+                }
+                
+                // Check for collision with player
+                if (player.mesh && projectile.position.distanceTo(player.position) < 0.5) {
+                    player.takeDamage(projectile.userData.damage);
+                    scene.remove(projectile);
+                    projectiles.splice(i, 1);
+                }
+            }
+        }
+        
+        // Set up controls
+        function setupControls() {
+            // Track pitch and yaw for camera rotation
+            let pitch = 0;
+            let yaw = 0;
+            
+            // Mouse controls for looking
+            const onMouseMove = (event) => {
+                if (!isRunning) return;
+                
+                const movementX = event.movementX || 0;
+                const movementY = event.movementY || 0;
+                
+                // Update yaw (horizontal rotation) and pitch (vertical rotation)
+                const rotSpeed = 0.002;
+                yaw -= movementX * rotSpeed;
+                pitch -= movementY * rotSpeed;
+                
+                // Clamp pitch to prevent over-rotation
+                pitch = Math.max(-Math.PI/2 + 0.01, Math.min(Math.PI/2 - 0.01, pitch));
+                
+                // Apply rotations to camera
+                camera.rotation.x = pitch;
+                camera.rotation.y = yaw;
+            };
+            
+            // Keyboard controls
+            const onKeyDown = (event) => {
+                switch (event.code) {
+                    case 'KeyW':
+                        moveForward = true;
+                        break;
+                    case 'KeyS':
+                        moveBackward = true;
+                        break;
+                    case 'KeyA':
+                        moveLeft = true;
+                        break;
+                    case 'KeyD':
+                        moveRight = true;
+                        break;
+                }
+            };
+            
+            const onKeyUp = (event) => {
+                switch (event.code) {
+                    case 'KeyW':
+                        moveForward = false;
+                        break;
+                    case 'KeyS':
+                        moveBackward = false;
+                        break;
+                    case 'KeyA':
+                        moveLeft = false;
+                        break;
+                    case 'KeyD':
+                        moveRight = false;
+                        break;
+                }
+            };
+            
+            // Mouse click to shoot
+            const onClick = () => {
+                if (!isRunning) return;
+                player.shoot();
+            };
+            
+            // Add event listeners
+            document.addEventListener('mousemove', onMouseMove, false);
+            document.addEventListener('keydown', onKeyDown, false);
+            document.addEventListener('keyup', onKeyUp, false);
+            document.addEventListener('click', onClick, false);
+            
+            // Request pointer lock when game starts
+            document.addEventListener('click', () => {
+                if (isRunning && document.pointerLockElement !== document.body) {
+                    document.body.requestPointerLock();
+                }
+            });
+        }
+
+        // Animation loop
+        function animate() {
+            if (!isRunning) return;
+            
+            try {
+            // Get delta time
+            const deltaTime = clock.getDelta();
+                const time = Date.now() * 0.001; // Current time in seconds
+                
+                // Update player
+                try {
+                    if (player && typeof player.update === 'function') {
+                        player.update(deltaTime);
+                    } else {
+                        console.warn("Player update skipped: player object or update method missing");
+                    }
+                } catch (playerError) {
+                    console.error("Error updating player:", playerError);
+                }
+                
+                // Update enemy/boss
+                try {
+                    if (enemy && enemy.alive && typeof enemy.update === 'function') {
+                        enemy.update(deltaTime);
+                    }
+                } catch (enemyError) {
+                    console.error("Error updating enemy:", enemyError);
+                }
+                
+                // Update projectiles
+                try {
+                    updateProjectiles(deltaTime);
+                } catch (projectileError) {
+                    console.error("Error updating projectiles:", projectileError);
+                }
+                
+                // Update all animated objects
+                try {
+                    for (let i = animatedObjects.length - 1; i >= 0; i--) {
+                        const obj = animatedObjects[i];
+                        
+                        // Skip if removed from scene
+                        if (!obj.parent) {
+                            animatedObjects.splice(i, 1);
+                            continue;
+                        }
+                        
+                        // Update based on animation type
+                        switch (obj.userData.animationType) {
+                            case 'fire':
+                                // Animate fire particles
+                                const speed = obj.userData.speed;
+                                const offset = obj.userData.offset;
+                                const baseY = obj.userData.baseY;
+                                
+                                // Vary height
+                                obj.position.y = baseY + Math.sin(time * speed + offset) * 0.3;
+                                
+                                // Flicker size
+                                const scale = 0.8 + Math.sin(time * speed * 2 + offset) * 0.2;
+                                obj.scale.set(scale, scale, scale);
+                                
+                                // Flicker opacity
+                                if (obj.material) {
+                                    obj.material.opacity = 0.5 + Math.sin(time * speed * 3 + offset) * 0.3;
+                                }
+                                break;
+                                
+                            case 'fireLight':
+                                // Flicker light intensity
+                                obj.intensity = 0.4 + Math.sin(time * 3) * 0.2;
+                                break;
+                                
+                            case 'undeadLight':
+                                // Pulse glow intensity
+                                obj.intensity = 0.3 + Math.sin(time * 2) * 0.1;
+                                break;
+                                
+                            case 'gear':
+                                // Rotate gears
+                                obj.rotation.y += obj.userData.rotSpeed * 0.01;
+                                break;
+                                
+                            case 'portal':
+                                // Animate portal particles
+                                const basePos = obj.userData.basePos;
+                                const particleSpeed = obj.userData.speed;
+                                const particleOffset = obj.userData.offset;
+                                
+                                // Spiral motion
+                                const angle = time * particleSpeed + particleOffset;
+                                const radius = 0.5 + Math.sin(time * 0.5 + particleOffset) * 0.3;
+                                
+                                obj.position.x = basePos.x + Math.cos(angle) * radius * 0.5;
+                                obj.position.y = basePos.y + Math.sin(angle) * radius * 0.3;
+                                
+                                // Scale variation
+                                const particleScale = 0.8 + Math.sin(time * particleSpeed + particleOffset) * 0.2;
+                                obj.scale.set(particleScale, particleScale, particleScale);
+                                break;
+                                
+                            case 'portalLight':
+                                // Pulse portal light
+                                obj.intensity = 0.5 + Math.sin(time * 2) * 0.2;
+                                break;
+                        }
+                    }
+                } catch (animationError) {
+                    console.error("Error updating animations:", animationError);
+                }
+                
+                // Check for pickups
+                try {
+                    checkPickupCollisions();
+                } catch (pickupError) {
+                    console.error("Error checking pickup collisions:", pickupError);
+                }
+                
+                // Check for door collision
+                try {
+                    checkDoorCollision();
+                } catch (doorError) {
+                    console.error("Error checking door collision:", doorError);
+                }
+                
+                // Ensure boss UI is visible during combat
+                try {
+                    ensureBossUIVisible();
+                } catch (uiError) {
+                    console.error("Error ensuring boss UI visibility:", uiError);
+                }
+            
+            // Render scene
+            renderer.render(scene, camera);
+            } catch (error) {
+                console.error("Error in animation loop:", error);
+                messageEl.textContent = "Game error: " + error.message;
+                messageEl.style.display = 'block';
+                messageEl.style.opacity = '1';
+                
+                // Don't immediately stop the game for minor errors
+                if (error.fatal) {
+                    isRunning = false;
+                    console.error("Fatal error - stopping game loop");
+                }
+            }
+        }
+        
+        // Handle window resize
+        function onWindowResize() {
+            if (!camera || !renderer) return;
+            
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // Game over
+        function gameOver() {
+            isRunning = false;
+            messageEl.textContent = `Game Over! You reached Room ${currentRoomIndex + 1}. Refresh to play again.`;
+            messageEl.style.display = 'block';
+            messageEl.style.opacity = '1';
+            
+            // Release pointer lock
+            document.exitPointerLock();
+        }
+        
+        // Add start button event
+        startButton.addEventListener('click', function() {
+            startButton.style.display = 'none';
+            init();
+            
+            // Request pointer lock
+            document.body.requestPointerLock();
+        });
+        
+        // Log that script loaded
+        console.log("Script loaded successfully");
+
+        function createWeaponPickup(position, weaponType) {
+            const pickup = new THREE.Group();
+            
+            // Create either a sword pickup
+            let pickupMesh;
+            let pickupColor = 0xffffff;
+            
+            // Different visuals based on weapon type
+            switch(weaponType) {
+                case 'Fire Blade':
+                    pickupColor = 0xff5500;
+                    break;
+                case 'Ice Saber':
+                    pickupColor = 0x00ccff;
+                    break;
+                case 'Soul Reaver':
+                    pickupColor = 0x9933ff;
+                    break;
+                default: // Basic Sword
+                    pickupColor = 0xcccccc;
+            }
+            
+            // Create sword-shaped pickup
+            const bladeGeo = new THREE.BoxGeometry(0.1, 0.4, 0.05);
+            const bladeMat = new THREE.MeshBasicMaterial({ color: pickupColor });
+            const blade = new THREE.Mesh(bladeGeo, bladeMat);
+            blade.position.y = 0.1;
+            pickup.add(blade);
+            
+            // Create handle
+            const handleGeo = new THREE.BoxGeometry(0.05, 0.15, 0.05);
+            const handleMat = new THREE.MeshBasicMaterial({ color: 0x8B4513 });
+            const handle = new THREE.Mesh(handleGeo, handleMat);
+            handle.position.y = -0.15;
+            pickup.add(handle);
+            
+            // Set position
+            pickup.position.copy(position);
+            pickup.position.y = 0.5; // Slightly above ground
+            
+            // Store weapon type
+            pickup.userData.type = 'weapon';
+            pickup.userData.weaponType = weaponType;
+            
+            // Add to scene and pickups array
+            scene.add(pickup);
+            pickups.push(pickup);
+            
+            // Make it float and rotate
+            pickup.userData.rotationSpeed = 0.02;
+            pickup.userData.floatOffset = Math.random() * Math.PI * 2;
+        }
+
+        // When player collects a weapon, update the weapon logic
+        function checkPickups() {
+            for (let i = pickups.length - 1; i >= 0; i--) {
+                const pickup = pickups[i];
+                
+                // Float and rotate animation
+                pickup.rotation.y += pickup.userData.rotationSpeed;
+                pickup.position.y = 0.5 + Math.sin(Date.now() / 500 + pickup.userData.floatOffset) * 0.1;
+                
+                if (player.position.distanceTo(pickup.position) < 1) {
+                    // Handle pickup based on type
+                    if (pickup.userData.type === 'weapon') {
+                        player.weapon = pickup.userData.weaponType;
+                        updateWeaponDisplay();
+                        playSound('powerup');
+                    } else if (pickup.userData.type === 'health') {
+                        player.health = Math.min(player.maxHealth, player.health + pickup.userData.amount);
+                        updateHealthDisplay();
+                        playSound('healthPickup');
+                    } else if (pickup.userData.type === 'strength') {
+                        player.strength += 0.1;
+                        updateStrengthDisplay();
+                        playSound('powerup');
+                    }
+                    
+                    // Remove pickup
+                    scene.remove(pickup);
+                    pickups.splice(i, 1);
+                }
+            }
+        }
+
+        // Function to update health display
+        function updateHealthDisplay() {
+            if (healthFill && player) {
+                healthFill.style.width = (player.health / player.maxHealth * 100) + '%';
+            }
+        }
+
+        // Function to update weapon display
+        function updateWeaponDisplay() {
+            if (currentWeapon && player) {
+                currentWeapon.textContent = player.weapon;
+                
+                // Set color based on weapon type
+                let color = '#cccccc';
+                switch(player.weapon) {
+                    case 'Fire Blade':
+                        color = '#ff5500';
+                        break;
+                    case 'Ice Saber':
+                        color = '#00ccff';
+                        break;
+                    case 'Soul Reaver':
+                        color = '#9933ff';
+                        break;
+                }
+                currentWeapon.style.color = color;
+            }
+        }
+
+        // Function to update level display
+        function updateLevelDisplay() {
+            if (roomStat) {
+                roomStat.textContent = currentRoomIndex + 1;
+            }
+        }
+
+        // Function to update strength display
+        function updateStrengthDisplay() {
+            if (strengthStat && player) {
+                strengthStat.textContent = player.strength.toFixed(1);
+            }
+        }
+
+        // Create player mesh function
+        function createPlayerMesh() {
+            // Player mesh is simple since this is a first-person game
+            // and player won't see themselves
+            const playerGroup = new THREE.Group();
+            
+            // Simple collision cylinder for the player
+            const bodyGeometry = new THREE.CylinderGeometry(0.5, 0.5, 1.5, 8);
+            const bodyMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x0000ff,
+                wireframe: true,
+                visible: false // Invisible in first-person
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.75; // Half height
+            playerGroup.add(body);
+            
+            return playerGroup;
+        }
+
+        // Initialize the player with default setup
+        function initPlayer() {
+            // Create player mesh
+            player = createPlayer();
+            
+            // Override the default weapon with a sword
+            player.weapon = 'Basic Sword';
+            
+            // Make sure the player has the attackWithSword method
+            if (!player.attackWithSword) {
+                player.attackWithSword = function() {
+                    return this.shoot();
+                };
+            }
+            
+            // Set initial position
+            player.position = new THREE.Vector3(0, 1, 0);
+            player.mesh.position.copy(player.position);
+            
+            updateHealthDisplay();
+            updateWeaponDisplay();
+        }
+
+        // In enemy class or functions
+        function handleEnemyDeath() {
+            // Drop item based on boss level
+            const dropPosition = enemy.mesh.position.clone();
+            
+            // Different drops based on level
+            if (currentRoomIndex === 1) {
+                // Level 1 boss drops Fire Blade
+                createWeaponPickup(dropPosition, 'Fire Blade');
+            } else if (currentRoomIndex === 2) {
+                // Level 2 boss drops Ice Saber
+                createWeaponPickup(dropPosition, 'Ice Saber');
+            } else if (currentRoomIndex === 3) {
+                // Level 3 boss drops Soul Reaver
+                createWeaponPickup(dropPosition, 'Soul Reaver');
+            } else {
+                // Random drops for higher levels
+                const weapons = ['Fire Blade', 'Ice Saber', 'Soul Reaver'];
+                const weaponType = weapons[Math.floor(Math.random() * weapons.length)];
+                createWeaponPickup(dropPosition, weaponType);
+            }
+            
+            // Also drop health or strength
+            if (Math.random() < 0.5) {
+                createHealthPickup(dropPosition.clone().add(new THREE.Vector3(1, 0, 1)));
+            } else {
+                createStrengthPickup(dropPosition.clone().add(new THREE.Vector3(-1, 0, 1)));
+            }
+        }
+
+        // Function to create health pickup
+        function createHealthPickup(position) {
+            const pickup = new THREE.Group();
+            
+            // Create health pack visual
+            const baseGeo = new THREE.BoxGeometry(0.4, 0.1, 0.4);
+            const baseMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const base = new THREE.Mesh(baseGeo, baseMat);
+            pickup.add(base);
+            
+            const crossGeo = new THREE.BoxGeometry(0.1, 0.15, 0.3);
+            const crossMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const crossV = new THREE.Mesh(crossGeo, crossMat);
+            crossV.position.y = 0.1;
+            pickup.add(crossV);
+            
+            const crossHGeo = new THREE.BoxGeometry(0.3, 0.15, 0.1);
+            const crossH = new THREE.Mesh(crossHGeo, crossMat);
+            crossH.position.y = 0.1;
+            pickup.add(crossH);
+            
+            // Set position
+            pickup.position.copy(position);
+            pickup.position.y = 0.5; // Slightly above ground
+            
+            // Store health pack info
+            pickup.userData.type = 'health';
+            pickup.userData.amount = 25; // Amount to heal
+            
+            // Add to scene and pickups array
+            scene.add(pickup);
+            pickups.push(pickup);
+            
+            // Make it float and rotate
+            pickup.userData.rotationSpeed = 0.02;
+            pickup.userData.floatOffset = Math.random() * Math.PI * 2;
+            
+            return pickup;
+        }
+
+        // Function to create strength pickup
+        function createStrengthPickup(position) {
+            const pickup = new THREE.Group();
+            
+            // Create strength boost visual
+            const baseGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.1, 8);
+            const baseMat = new THREE.MeshBasicMaterial({ color: 0xdddddd });
+            const base = new THREE.Mesh(baseGeo, baseMat);
+            pickup.add(base);
+            
+            const sphereGeo = new THREE.SphereGeometry(0.15, 8, 8);
+            const sphereMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+            const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+            sphere.position.y = 0.15;
+            pickup.add(sphere);
+            
+            // Set position
+            pickup.position.copy(position);
+            pickup.position.y = 0.5; // Slightly above ground
+            
+            // Store strength boost info
+            pickup.userData.type = 'strength';
+            pickup.userData.amount = 0.1; // Amount to boost strength
+            
+            // Add to scene and pickups array
+            scene.add(pickup);
+            pickups.push(pickup);
+            
+            // Make it float and rotate
+            pickup.userData.rotationSpeed = 0.02;
+            pickup.userData.floatOffset = Math.random() * Math.PI * 2;
+            
+            return pickup;
+        }
+
+        // Function for boss attack interval clearing
+        function clearBossAttackInterval() {
+            // If we have any interval timers for boss attacks, clear them
+            if (window.bossAttackInterval) {
+                clearInterval(window.bossAttackInterval);
+                window.bossAttackInterval = null;
+            }
+        }
+
+        // Function to generate a new room
+        function generateRoom() {
+            // Determine new room theme
+            const themes = ['fire', 'ice', 'undead', 'mechanical'];
+            const nextTheme = themes[currentRoomIndex % themes.length];
+            
+            // Create new room
+            createRoom(nextTheme, currentRoomIndex + 1);
+            
+            // Reset player position
+            camera.position.set(0, 1.7, 8);
+            player.position.copy(camera.position);
+            
+            // Small health recovery
+            player.health = Math.min(player.maxHealth, player.health + 20);
+            updateHealthDisplay();
+            
+            // Show level transition message
+            player.showPickupMessage(`Entered Room ${currentRoomIndex + 1}`);
+        }
+
+        // Function to spawn a new boss
+        function spawnBoss() {
+            // Calculate difficulty increase
+            const difficulty = 1 + currentRoomIndex * 0.3;
+            
+            // Determine theme based on current room
+            const themes = ['fire', 'ice', 'undead', 'mechanical'];
+            const theme = themes[currentRoomIndex % themes.length];
+            
+            // Create new boss
+            enemy = createBoss(theme, difficulty);
+            
+            // Show boss UI
+            enemy.showBossUI();
+        }
+
+        // Function to ensure boss health UI is visible
+        function ensureBossUIVisible() {
+            if (enemy && enemy.alive) {
+                bossHealthBar.style.display = 'block';
+                bossNameElement.style.display = 'block';
+                // Update health percentage
+                bossHealthFill.style.width = (enemy.health / enemy.maxHealth * 100) + '%';
+            }
+        }
+
+        // Function for playing sound effects (stub for now)
+        function playSound(soundType) {
+            // In a real game, this would play actual sounds
+            console.log(`Playing sound: ${soundType}`);
+        }
+    </script>
+</body>
+</html>
